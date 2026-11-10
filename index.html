@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dijkstra y Bellman-Ford</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: documento académico de dos columnas — red a la izquierda, cálculo y tablas a la derecha; una columna en móvil */
+:root{
+  --bg:#F3F5F6; --surface:#FFFFFF; --ink:#1C2933; --ink-2:#10212E; --muted:#5C6B77; --line:#D7DDE2;
+  --accent:#215E7C; --accent-soft:#E4EDF2; --on-accent:#FFFFFF;
+  --hl:#F4EDD6; --hl-ink:#6E5716; --good:#2F6B45; --bad:#9A3B2A;
+  --f-head:Cambria, Georgia, "Times New Roman", serif;
+  --f-body:"Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  --f-mono:Consolas, ui-monospace, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10171D; --surface:#171F27; --ink:#DEE6EC; --ink-2:#EDF3F7; --muted:#8C9BA8; --line:#2B3843;
+  --accent:#6CA7C4; --accent-soft:#1D3340; --on-accent:#0C1920;
+  --hl:#3B3320; --hl-ink:#D8BC6A; --good:#6FBF8F; --bad:#E08A74; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10171D; --surface:#171F27; --ink:#DEE6EC; --ink-2:#EDF3F7; --muted:#8C9BA8; --line:#2B3843;
+  --accent:#6CA7C4; --accent-soft:#1D3340; --on-accent:#0C1920;
+  --hl:#3B3320; --hl-ink:#D8BC6A; --good:#6FBF8F; --bad:#E08A74; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:26px 36px}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header p.course{margin:0;font-size:12.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+h1{font:700 clamp(25px,3.2vw,33px)/1.2 var(--f-head);color:var(--ink-2);margin:6px 0 4px;text-wrap:balance}
+.sub{color:var(--muted);margin:0;max-width:70ch}
+nav.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line)}
+nav.tabs button{border:0;background:none;padding:10px 2px;margin-bottom:-1px;cursor:pointer;
+  font:600 14.5px var(--f-body);color:var(--muted);border-bottom:2px solid transparent}
+nav.tabs button[aria-selected="true"]{color:var(--ink-2);border-bottom-color:var(--accent)}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:16px 18px;min-width:0}
+.panel h2{font:600 12.5px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+svg{display:block;width:100%;height:auto;max-width:100%}
+.legend{font-size:13px;color:var(--muted);margin-top:10px}
+.legend .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:baseline}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 14px var(--f-body);
+  padding:8px 14px;border-radius:4px;cursor:pointer}
+.btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary:hover:not(:disabled){color:var(--on-accent);filter:brightness(1.06)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.spacer{flex:1}
+.field{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+select{font:600 14px var(--f-body);padding:7px 9px;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.check-label{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:600;cursor:pointer;user-select:none}
+.check-label input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;margin:0}
+.status{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px}
+.step{font:700 21px var(--f-head);color:var(--ink-2)}
+.state{font-size:13.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--good);font-weight:600}
+.explain{margin:8px 0 0;max-width:68ch}
+.calc{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:5px}
+.calc li{font:500 13.5px var(--f-mono);font-variant-numeric:tabular-nums;padding:6px 10px;border-radius:3px;
+  background:var(--bg);border:1px solid var(--line);cursor:pointer;overflow-wrap:anywhere}
+.calc li.upd{background:var(--hl);border-color:var(--hl)}
+.calc li.best{background:var(--accent-soft);border-color:var(--accent-soft)}
+.calc li.sel{border-color:var(--accent)}
+.calc .note{font-family:var(--f-body);font-size:12px;color:var(--hl-ink);margin-left:6px}
+.practice{margin-top:12px;padding:12px 14px;border:1px solid var(--line);border-radius:4px;background:var(--bg);
+  display:flex;flex-direction:column;gap:8px}
+.practice p{margin:0}
+.practice .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.feedback{font-weight:600}
+.feedback.ok{color:var(--good)} .feedback.no{color:var(--bad)}
+.score{font:600 12.5px var(--f-mono);color:var(--muted)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;min-width:520px}
+th,td{border:1px solid var(--line);padding:5px 6px;text-align:center}
+th{background:var(--bg);color:var(--ink-2);font:600 13px var(--f-body)}
+td{font:600 14.5px var(--f-mono)}
+td small{display:block;font:500 11px var(--f-mono);color:var(--muted)}
+td.lbl{font:500 13px var(--f-mono);background:var(--bg);white-space:nowrap;color:var(--ink)}
+td.upd{background:var(--hl)}
+tr.cur td{box-shadow:inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent)}
+.result table{min-width:0}
+.result td{font-size:14px}
+.foot{font-size:12px;color:var(--muted)}
+footer{font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+.node{cursor:pointer}
+.node:focus{outline:none}
+.node:focus-visible circle.ring{stroke:var(--accent);stroke-width:3}
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="course">Comunicaciones y redes de computadores · Capítulo 10 · Apéndice 10A</p>
+    <h1 id="title">Ejercicio 10.10 · Dijkstra desde el nodo 2</h1>
+    <p class="sub" id="subtitle"></p>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Ejercicio">
+    <button role="tab" id="tab-dijkstra" aria-selected="true">Ejercicio 10.10 · Dijkstra</button>
+    <button role="tab" id="tab-bellman" aria-selected="false">Ejercicio 10.11 · Bellman-Ford</button>
+  </nav>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" aria-label="Red y controles">
+        <h2>Red de la figura 10.6 · seleccione un nodo</h2>
+        <svg id="graph" viewBox="0 0 640 370" role="img" aria-label="Red de seis nodos con costes dirigidos"></svg>
+        <p class="legend" id="legend"></p>
+        <div class="toolbar">
+          <button class="btn" id="b-reset">Reiniciar</button>
+          <button class="btn" id="b-back" title="Paso anterior (←)">← Anterior</button>
+          <button class="btn primary" id="b-next" title="Siguiente paso (→)">Siguiente →</button>
+          <span class="spacer"></span>
+        </div>
+        <div class="toolbar">
+          <label class="field" for="src">Nodo origen
+            <select id="src">
+              <option value="1">1</option><option value="2" selected>2 (ejercicio)</option><option value="3">3</option>
+              <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+            </select>
+          </label>
+          <span class="spacer"></span>
+          <label class="check-label" for="practice"><input type="checkbox" id="practice"> Modo práctica</label>
+        </div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel" aria-live="polite">
+        <div class="status"><span class="step" id="step"></span><span class="state" id="state"></span></div>
+        <p class="explain" id="explain"></p>
+        <ul class="calc" id="calc"></ul>
+        <div class="practice" id="practiceBox" hidden></div>
+      </section>
+      <section class="panel">
+        <h2 id="tableTitle">Tabla de iteraciones</h2>
+        <div class="tablewrap"><table id="table"></table></div>
+        <p class="foot">Las celdas sombreadas indican el valor que cambió en ese paso. Debajo de cada coste se muestra el camino.</p>
+      </section>
+      <section class="panel result" id="resultBox" hidden>
+        <h2>Resultado final</h2>
+        <div class="tablewrap"><table id="result"></table></div>
+        <p class="foot" id="resultNote"></p>
+      </section>
+    </div>
+  </div>
+
+  <footer>Ejercicios 10.10 y 10.11 sobre la red de la figura 10.6 — W. Stallings, <i>Comunicaciones y redes de computadores</i>, capítulo 10.</footer>
+</div>
+
+<script>
+(function(){
+const N=[1,2,3,4,5,6];
+const COST={'1-2':2,'2-1':3,'1-3':5,'3-1':8,'1-4':1,'4-1':7,'2-3':3,'3-2':6,'2-4':2,'4-2':2,'3-4':3,'4-3':3,'3-5':1,'5-3':1,'3-6':5,'6-3':8,'4-5':1,'5-4':1,'5-6':2,'6-5':4};
+const EDGES=[[1,2],[1,3],[1,4],[2,3],[2,4],[3,4],[3,5],[3,6],[4,5],[5,6]];
+const POS={1:[70,190],2:[205,62],3:[430,62],4:[250,305],5:[450,305],6:[585,185]};
+const BADGE_UP={2:1,3:1};
+const W=(i,j)=>i===j?0:(COST[i+'-'+j]??Infinity);
+const f=v=>isFinite(v)?String(v):'∞';
+const ps=p=>p?p.join('-'):'—';
+const $=id=>document.getElementById(id);
+
+let algo='dijkstra', src=2, practice=false, hist=[], sel=null, pick=new Set(), fb=null, score={ok:0,tries:0};
+
+/* ---------- Dijkstra ---------- */
+function dInit(s){const L={},P={};N.forEach(n=>{L[n]=n===s?0:W(s,n);P[n]=n===s?[s]:(isFinite(L[n])?[s,n]:null)});
+  return {T:[s],L,P,x:null,changed:N.filter(n=>n!==s&&isFinite(L[n])),calc:[]};}
+function dCands(st){const out=N.filter(n=>!st.T.includes(n));const m=Math.min(...out.map(n=>st.L[n]));return out.filter(n=>st.L[n]===m);}
+function dStep(st,x){const T=[...st.T,x],L={...st.L},P={...st.P},changed=[],calc=[];
+  N.forEach(n=>{if(T.includes(n))return;const w=W(x,n),via=L[x]+w;calc.push({n,old:st.L[n],lx:L[x],w,via});
+    if(via<L[n]){L[n]=via;P[n]=[...P[x],n];changed.push(n);}});
+  return {T,L,P,x,changed,calc};}
+const dDone=st=>st.T.length===N.length;
+
+/* ---------- Bellman-Ford ---------- */
+function bInit(s){const L={},P={};N.forEach(n=>{L[n]=n===s?0:Infinity;P[n]=n===s?[s]:null});return {h:0,L,P,changed:[],calc:{},done:false};}
+function bStep(st){const L={},P={},changed=[],calc={};
+  N.forEach(n=>{if(n===src){L[n]=0;P[n]=[src];return;}
+    let best=st.L[n],bp=st.P[n];const c=[];
+    N.forEach(j=>{if(j===n)return;const w=W(j,n);if(!isFinite(w))return;const v=st.L[j]+w;c.push({j,lj:st.L[j],w,v});
+      if(v<best){best=v;bp=[...st.P[j],n];}});
+    calc[n]=c;L[n]=best;P[n]=bp;if(best<st.L[n])changed.push(n);});
+  return {h:st.h+1,L,P,changed,calc,done:changed.length===0};}
+
+const cur=()=>hist[hist.length-1];
+const isDone=()=>algo==='dijkstra'?dDone(cur()):cur().done;
+const others=()=>N.filter(n=>n!==src);
+
+function reset(){hist=[algo==='dijkstra'?dInit(src):bInit(src)];sel=null;pick.clear();fb=null;render();}
+function next(auto){
+  if(isDone())return;
+  const st=cur();
+  if(algo==='dijkstra'){const x=dCands(st)[0];hist.push(dStep(st,x));}
+  else hist.push(bStep(st));
+  if(practice&&!auto){fb={ok:false,text:'Respuesta mostrada. Intente el siguiente paso.'};}
+  else if(!practice) fb=null;
+  pick.clear();render();
+}
+function back(){if(hist.length>1){hist.pop();pick.clear();fb=null;render();}}
+
+/* ---------- Práctica ---------- */
+function nodeClick(n){
+  if(practice&&!isDone()){
+    if(algo==='dijkstra'){
+      const st=cur();if(st.T.includes(n)){fb={ok:false,text:'El nodo '+n+' ya está en T. Elija uno de fuera.'};render();return;}
+      score.tries++;const c=dCands(st);
+      if(c.includes(n)){score.ok++;hist.push(dStep(st,n));sel=null;
+        const ch=cur().changed;fb={ok:true,text:'Correcto: entra el '+n+' con L = '+f(st.L[n])+'.'+(ch.length?' Se actualiza: '+ch.map(k=>'L('+k+')').join(', ')+'.':' No mejora ningún valor.')};}
+      else{const m=st.L[c[0]];fb={ok:false,text:'Incorrecto. L('+n+') = '+f(st.L[n])+', pero hay nodos fuera de T con L = '+f(m)+'.'};}
+      render();return;
+    }else{ if(n===src)return; pick.has(n)?pick.delete(n):pick.add(n); fb=null; render(); return; }
+  }
+  sel=n;render();
+}
+function bCheck(){
+  const st=cur(),nx=bStep(st),truth=new Set(nx.changed);score.tries++;
+  const same=truth.size===pick.size&&[...truth].every(k=>pick.has(k));
+  if(same){score.ok++;hist.push(nx);
+    fb={ok:true,text:nx.done?'Correcto: ningún valor cambia y el algoritmo termina.':'Correcto: cambian '+nx.changed.map(k=>'L('+k+')').join(', ')+'.'};pick.clear();}
+  else{const miss=[...truth].filter(k=>!pick.has(k)),extra=[...pick].filter(k=>!truth.has(k));
+    fb={ok:false,text:'Aún no.'+(miss.length?' Falta algún nodo que sí mejora.':'')+(extra.length?' Marcó '+extra.join(', ')+', que no mejora'+(extra.length>1?'n':'')+'.':'')+' Revise L'+sub(st.h)+'(j) + w(j, n) para cada vecino j.'};}
+  render();
+}
+const SUBS='₀₁₂₃₄₅₆₇₈₉';const sub=k=>String(k).split('').map(d=>SUBS[+d]).join('');
+
+/* ---------- Render ---------- */
+function render(){
+  const st=cur(),done=isDone(),D=algo==='dijkstra';
+  $('tab-dijkstra').setAttribute('aria-selected',D);$('tab-bellman').setAttribute('aria-selected',!D);
+  const ej=src===2?(D?'Ejercicio 10.10 · ':'Ejercicio 10.11 · '):'';
+  $('title').textContent=ej+(D?'Dijkstra':'Bellman-Ford')+' desde el nodo '+src;
+  $('subtitle').textContent=D?'Encuentra los caminos en orden creciente de coste: en cada iteración entra a T el nodo más cercano al origen.'
+    :'Calcula el mejor camino con a lo sumo h enlaces: h = 1, 2, 3… hasta que ningún valor cambie.';
+  $('b-back').disabled=hist.length<=1;$('b-next').disabled=done;
+  $('b-next').textContent=practice&&!done?'Mostrar respuesta →':'Siguiente →';
+  if(D){$('step').textContent='Iteración '+st.T.length+' de '+N.length;}
+  else{$('step').textContent='h = '+st.h;}
+  const state=$('state');state.textContent=done?'Terminado':(D?'T = {'+st.T.join(', ')+'}':'Caminos de a lo sumo '+st.h+' enlace'+(st.h===1?'':'s'));
+  state.className='state'+(done?' done':'');
+  renderExplain(st,D,done);renderPractice(st,D,done);renderGraph(st,D);renderTable(D);renderResult(st,done);
+  try{localStorage.setItem('mc-algo',algo)}catch(e){}
+}
+
+function renderExplain(st,D,done){
+  const ex=$('explain'),ul=$('calc');ul.innerHTML='';
+  const li=(html,cls,n)=>{const e=document.createElement('li');e.innerHTML=html;if(cls)e.className=cls;if(n!=null){e.onclick=()=>{sel=n;render();};}ul.appendChild(e);};
+  if(D){
+    if(st.x==null){ex.innerHTML='<b>Paso 1.</b> T = {'+src+'}. Cada L(n) empieza con el coste directo w('+src+', n); si no hay enlace, ∞.';
+      others().forEach(n=>li('L('+n+') = w('+src+','+n+') = '+f(st.L[n]),(sel===n?'sel ':'')+(isFinite(st.L[n])?'upd':''),n));}
+    else{ex.innerHTML='<b>Paso 2.</b> Entra a T el nodo <b>'+st.x+'</b> (menor L fuera de T = '+f(hist[hist.length-2].L[st.x])+'). '+
+      (st.calc.length?'<b>Paso 3.</b> Para cada nodo fuera de T: L(n) = min[ L(n), L('+st.x+') + w('+st.x+', n) ].':'Todos los nodos están en T.');
+      st.calc.forEach(c=>{const up=c.via<c.old;
+        li('L('+c.n+') = min[ '+f(c.old)+', '+c.lx+' + '+f(c.w)+' ] = '+f(Math.min(c.old,c.via))+(up?'<span class="note">mejora</span>':''),(up?'upd ':'')+(sel===c.n?'sel':''),c.n);});}
+    if(done)ex.innerHTML+=' <b>T contiene todos los nodos: fin.</b>';
+  }else{
+    if(st.h===0){ex.innerHTML='<b>Paso 1.</b> L'+sub(0)+'('+src+') = 0 y L'+sub(0)+'(n) = ∞ para el resto: con 0 enlaces solo se alcanza el origen.';return;}
+    const prev=hist[hist.length-2];
+    let n=sel&&sel!==src?sel:(st.changed[0]||others()[others().length-1]);
+    ex.innerHTML='<b>Paso 2.</b> L'+sub(st.h)+'(n) = min<sub>j</sub>[ L'+sub(st.h-1)+'(j) + w(j, n) ]. Cálculo para el nodo <b>'+n+'</b> (seleccione otro nodo para verlo):'+
+      (st.done?' <b>Ningún valor cambió respecto a h = '+(st.h-1)+': fin.</b>':'');
+    const best=st.L[n];
+    li('j = '+n+' (seguir igual): L'+sub(st.h-1)+'('+n+') = '+f(prev.L[n]),prev.L[n]===best&&!st.changed.includes(n)?'best':'');
+    (st.calc[n]||[]).forEach(c=>li('j = '+c.j+': L'+sub(st.h-1)+'('+c.j+') + w('+c.j+','+n+') = '+f(c.lj)+' + '+c.w+' = '+f(c.v),
+      (c.v===best&&isFinite(best)&&st.changed.includes(n)&&st.P[n][st.P[n].length-2]===c.j)?'best':''));
+  }
+}
+
+function renderPractice(st,D,done){
+  const box=$('practiceBox');box.hidden=!practice;if(!practice)return;
+  let h='';
+  if(done)h='<p><b>Ejercicio completo.</b> Aciertos: '+score.ok+' de '+score.tries+'. Pulse Reiniciar para repetirlo.</p>';
+  else if(D)h='<p><b>Su turno:</b> seleccione en la red el nodo que entra a T en la siguiente iteración.</p>';
+  else h='<p><b>Su turno:</b> marque en la red los nodos cuyo L'+sub(st.h+1)+' será menor que L'+sub(st.h)+'. Si considera que ninguno cambia, compruebe sin marcar.</p>'+
+    '<div class="row"><button class="btn" id="b-check">Comprobar'+(pick.size?' ('+[...pick].sort().join(', ')+')':': ninguno cambia')+'</button></div>';
+  if(fb)h+='<p class="feedback '+(fb.ok?'ok':'no')+'">'+fb.text+'</p>';
+  h+='<p class="score">Aciertos: '+score.ok+' / '+score.tries+'</p>';
+  box.innerHTML=h;const bc=$('b-check');if(bc)bc.onclick=bCheck;
+}
+
+function renderGraph(st,D){
+  const svg=$('graph');let s='<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--accent)"/></marker></defs>';
+  EDGES.forEach(([a,b])=>{const [x1,y1]=POS[a],[x2,y2]=POS[b];s+='<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="var(--line)" stroke-width="2.5"/>';});
+  N.forEach(n=>{const p=st.P[n];if(!p||p.length<2)return;const a=p[p.length-2];let [x1,y1]=POS[a],[x2,y2]=POS[n];
+    const dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy),r=26;x1+=dx/L*r;y1+=dy/L*r;x2-=dx/L*(r+2);y2-=dy/L*(r+2);
+    const firm=D?st.T.includes(n):true;
+    s+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" marker-end="url(#arr)"'+(firm?'':' stroke-dasharray="7 6" opacity=".85"')+'/>';});
+  EDGES.forEach(([a,b])=>{[[a,b],[b,a]].forEach(([i,j])=>{const [x1,y1]=POS[i],[x2,y2]=POS[j];const t=.3;const cx=x1+(x2-x1)*t,cy=y1+(y2-y1)*t;
+    s+='<g><rect x="'+(cx-11)+'" y="'+(cy-10)+'" width="22" height="20" rx="3" fill="var(--surface)" stroke="var(--line)"/><text x="'+cx+'" y="'+(cy+5)+'" text-anchor="middle" font-family="var(--f-mono)" font-size="13" font-weight="600" fill="var(--ink)">'+W(i,j)+'</text></g>';});});
+  const chg=new Set(st.changed);
+  N.forEach(n=>{const [x,y]=POS[n];const isSrc=n===src,inT=D?st.T.includes(n):isFinite(st.L[n]);
+    const fill=isSrc?'var(--accent)':(inT?'var(--accent-soft)':'var(--surface)');
+    const stroke=isSrc?'var(--accent)':(inT?'var(--accent)':'var(--muted)');
+    const tc=isSrc?'var(--on-accent)':'var(--ink)';
+    const ringC=chg.has(n)?'var(--hl-ink)':(pick.has(n)?'var(--ink)':'transparent');
+    s+='<g class="node" data-n="'+n+'" tabindex="0" role="button" aria-label="Nodo '+n+', L = '+f(st.L[n])+'">'+
+      '<circle class="ring" cx="'+x+'" cy="'+y+'" r="27" fill="none" stroke="'+ringC+'" stroke-width="3"'+(pick.has(n)?' stroke-dasharray="5 4"':'')+'/>'+
+      '<circle cx="'+x+'" cy="'+y+'" r="21" fill="'+fill+'" stroke="'+stroke+'" stroke-width="2"/>'+
+      '<text x="'+x+'" y="'+(y+6)+'" text-anchor="middle" font-family="var(--f-body)" font-size="18" font-weight="600" fill="'+tc+'">'+n+'</text>';
+    const by=BADGE_UP[n]?y-46:y+50;
+    s+='<text x="'+x+'" y="'+by+'" text-anchor="middle" font-family="var(--f-mono)" font-size="14" font-weight="600" fill="'+(chg.has(n)?'var(--hl-ink)':'var(--muted)')+'">'+(isSrc?'origen':'L='+f(st.L[n]))+'</text></g>';});
+  svg.innerHTML=s;
+  svg.querySelectorAll('.node').forEach(g=>{const n=+g.dataset.n;g.onclick=()=>nodeClick(n);g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();nodeClick(n);}};});
+  $('legend').innerHTML='<span class="dot" style="background:var(--accent)"></span>origen · '+
+    '<span class="dot" style="background:var(--accent-soft);border:1.5px solid var(--accent)"></span>'+(D?'en T (definitivo)':'alcanzado')+' · '+
+    '<span class="dot" style="border:1.5px solid var(--hl-ink)"></span>cambió en este paso · línea gruesa = camino actual'+(D?' (punteada: provisional)':'')+'. El número junto a un enlace es el coste saliendo del nodo más cercano.';
+}
+
+function cell(L,P,n,up){return '<td class="'+(up?'upd':'')+'">'+f(L[n])+(isFinite(L[n])&&n!==src?'<small>'+ps(P[n])+'</small>':'')+'</td>';}
+function renderTable(D){
+  const t=$('table'),o=others();
+  $('tableTitle').textContent=D?'Tabla de iteraciones (formato de la Tabla 10.4a)':'Tabla por número de enlaces h (formato de la Tabla 10.4b)';
+  let h='<thead><tr>'+(D?'<th>It.</th><th>T</th>':'<th>h</th>')+o.map(n=>'<th>L('+n+')</th>').join('')+'</tr></thead><tbody>';
+  hist.forEach((st,i)=>{const chg=new Set(st.changed);const last=i===hist.length-1;
+    h+='<tr class="'+(last?'cur':'')+'">'+(D?'<td class="lbl">'+(i+1)+'</td><td class="lbl">{'+st.T.join(',')+'}</td>':'<td class="lbl">'+st.h+'</td>')+
+      o.map(n=>cell(st.L,st.P,n,chg.has(n))).join('')+'</tr>';});
+  t.innerHTML=h+'</tbody>';
+}
+function renderResult(st,done){
+  $('resultBox').hidden=!done;if(!done)return;
+  let h='<thead><tr><th>Destino</th><th>Coste mínimo</th><th>Camino</th><th>Siguiente nodo</th></tr></thead><tbody>';
+  others().forEach(n=>{h+='<tr><td>'+n+'</td><td>'+f(st.L[n])+'</td><td>'+ps(st.P[n])+'</td><td>'+st.P[n][1]+'</td></tr>';});
+  $('result').innerHTML=h+'</tbody>';
+  $('resultNote').textContent='La columna "Siguiente nodo" es la fila del nodo '+src+' en la matriz de encaminamiento estático (Fig. 10.7). Dijkstra y Bellman-Ford llegan al mismo resultado.';
+}
+
+/* ---------- Eventos ---------- */
+function setAlgo(a){algo=a;history.replaceState(null,'',a==='dijkstra'?'#dijkstra':'#bellman-ford');score={ok:0,tries:0};reset();}
+$('tab-dijkstra').onclick=()=>setAlgo('dijkstra');
+$('tab-bellman').onclick=()=>setAlgo('bellman');
+$('b-reset').onclick=()=>{score={ok:0,tries:0};reset();};
+$('b-next').onclick=()=>next(false);
+$('b-back').onclick=back;
+$('src').onchange=e=>{src=+e.target.value;score={ok:0,tries:0};reset();};
+$('practice').onchange=e=>{practice=e.target.checked;score={ok:0,tries:0};reset();};
+document.addEventListener('keydown',e=>{if(e.target.tagName==='SELECT')return;if(e.key==='ArrowRight')next(false);if(e.key==='ArrowLeft')back();});
+window.addEventListener('hashchange',()=>{const a=location.hash==='#bellman-ford'?'bellman':'dijkstra';if(a!==algo){algo=a;reset();}});
+let start='dijkstra';if(location.hash==='#bellman-ford')start='bellman';else if(!location.hash){try{if(localStorage.getItem('mc-algo')==='bellman')start='bellman'}catch(e){}}
+algo=start;reset();
+window.__mc={get hist(){return hist},setAlgo,next,setSrc(v){src=v;reset();}};
+})();
+</script>
+
+</html>
